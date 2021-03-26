@@ -1,0 +1,28 @@
+[
+    {
+        "productId": 1,
+        "manufacturer": "Johns-Jenkins",
+        "sku": "asjdkhfga46",
+        "pricePerUnit": "497.45",
+        "quantityOnHand": 9703,
+        "productName": "sticky note"
+    },
+    {
+        "productId": 2,
+        "manufacturer": "Hessel, Schimmel and Feeney",
+        "sku": "ghfj324gd",
+        "upc": "6549832154688631",
+        "pricePerUnit": "457.45",
+        "quantityOnHand": 9265,
+        "productName": "leg warmers"
+    },
+    {
+        "productId": 3,
+        "manufacturer": "Swaniawski, Bartoletti and Bruen",
+        "sku": "poriut02knfddj",
+        "upc": "6656598798632",
+        "pricePerUnit": "431.45",
+        "quantityOnHand": 5980,
+        "productName": "lamp shade"
+    }
+]
