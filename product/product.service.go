@@ -3,7 +3,7 @@ package product
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,99 +11,118 @@ import (
 	"github.com/kele89/inventoryservice/cors"
 )
 
-const productBasePath = "products"
-
-func SetUpRoutes(apiBasePath string) {
-	productsHandler := http.HandlerFunc(handleProducts)
-	productHandler := http.HandlerFunc(handleProduct)
-	http.Handle(fmt.Sprintf("%s/%s", apiBasePath, productBasePath), cors.Middleware(productsHandler))
-	http.Handle(fmt.Sprintf("%s/%s/", apiBasePath, productBasePath), cors.Middleware(productHandler))
-}
+const productsPath = "products"
 
 func handleProducts(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		productList := getProductList()
-		productJSON, err := json.Marshal(productList)
+		productList, err := getProductList()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(productJSON)
-	case http.MethodPost:
-		var newProduct Product
-		bodyBytes, err := ioutil.ReadAll(r.Body)
+		j, err := json.Marshal(productList)
 		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = w.Write(j)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case http.MethodPost:
+		var product Product
+		err := json.NewDecoder(r.Body).Decode(&product)
+		if err != nil {
+			log.Print(err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		err = json.Unmarshal(bodyBytes, &newProduct)
+		productID, err := insertProduct(product)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
 			return
-		}
-		if newProduct.ProductId != 0 {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		_, err = addOrUpdateProduct(newProduct)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
 		}
 		w.WriteHeader(http.StatusCreated)
-		return
-	case http.MethodOptions:
-		return
-	}
-}
-
-func handleProduct(w http.ResponseWriter, r *http.Request) {
-	urlPathSegments := strings.Split(r.URL.Path, "products/")
-	productId, err := strconv.Atoi(urlPathSegments[len(urlPathSegments)-1])
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	product := getProduct(productId)
-	if product == nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		productJSON, err := json.Marshal(product)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(productJSON)
-	case http.MethodPut:
-		var updatedProduct Product
-		bodyBytes, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		err = json.Unmarshal(bodyBytes, &updatedProduct)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if updatedProduct.ProductId != productId {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		addOrUpdateProduct(updatedProduct)
-		w.WriteHeader(http.StatusOK)
-		return
-	case http.MethodDelete:
-		removeProduct(productId)
+		w.Write([]byte(fmt.Sprintf(`{"productId":%d}`, productID)))
 	case http.MethodOptions:
 		return
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func handleProduct(w http.ResponseWriter, r *http.Request) {
+	urlPathSegments := strings.Split(r.URL.Path, fmt.Sprintf("%s/", productsPath))
+	if len(urlPathSegments[1:]) > 1 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	productID, err := strconv.Atoi(urlPathSegments[len(urlPathSegments)-1])
+	if err != nil {
+		log.Print(err)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		product, err := getProduct(productID)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if product == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		j, err := json.Marshal(product)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_, err = w.Write(j)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	case http.MethodPut:
+		var product Product
+		err := json.NewDecoder(r.Body).Decode(&product)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// if *product.ProductId != productID {
+		// 	w.WriteHeader(http.StatusBadRequest)
+		// 	return
+		// }
+		err = updateProduct(product)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	case http.MethodDelete:
+		err := removeProduct(productID)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+	case http.MethodOptions:
+		return
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+// SetupRoutes :
+func SetupRoutes(apiBasePath string) {
+	productsHandler := http.HandlerFunc(handleProducts)
+	productHandler := http.HandlerFunc(handleProduct)
+	http.Handle(fmt.Sprintf("%s/%s", apiBasePath, productsPath), cors.Middleware(productsHandler))
+	http.Handle(fmt.Sprintf("%s/%s/", apiBasePath, productsPath), cors.Middleware(productHandler))
 }

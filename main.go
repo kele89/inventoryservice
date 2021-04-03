@@ -1,14 +1,20 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/kele89/inventoryservice/database"
 	"github.com/kele89/inventoryservice/product"
+	"github.com/kele89/inventoryservice/receipt"
 )
 
-const apiBasePath = "/api"
+const basePath = "/api"
 
 func main() {
-	product.SetUpRoutes(apiBasePath)
-	http.ListenAndServe(":5000", nil)
+	database.SetupDatabase()
+	receipt.SetupRoutes(basePath)
+	product.SetupRoutes(basePath)
+	log.Fatal(http.ListenAndServe(":5000", nil))
 }
